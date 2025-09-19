@@ -1,0 +1,119 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: task-frontend-service
+  namespace: task-app
+  labels:
+    app: task-frontend
+    app.kubernetes.io/name: task-frontend
+    app.kubernetes.io/component: service
+    app.kubernetes.io/part-of: task-management
+spec:
+  type: ClusterIP
+  selector:
+    app: task-frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: task-frontend-ingress
+  namespace: task-app
+  labels:
+    app: task-frontend
+    app.kubernetes.io/name: task-frontend
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: task-management
+  annotations:
+    # Nginx Ingress Controller annotations
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'self';" always;
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit-rps: "10"
+    nginx.ingress.kubernetes.io/rate-limit-burst: "20"
+    nginx.ingress.kubernetes.io/rate-limit-connections: "5"
+    
+    # Enable compression
+    nginx.ingress.kubernetes.io/enable-compression: "true"
+    
+    # Certificate management (cert-manager)
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    
+    # AWS Load Balancer Controller annotations (if using AWS)
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+    
+spec:
+  tls:
+  - hosts:
+    - tasks.4sale.com
+    - www.tasks.4sale.com
+    secretName: frontend-tls-secret
+  
+  rules:
+  - host: tasks.4sale.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: task-frontend-service
+            port:
+              number: 80
+  
+  - host: www.tasks.4sale.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: task-frontend-service
+            port:
+              number: 80
+  
+  # API routes to backend
+  - host: api.4sale.com
+    http:
+      paths:
+      - path: /api/v1
+        pathType: Prefix
+        backend:
+          service:
+            name: task-backend-service
+            port:
+              number: 80
+
+---
+# Frontend RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: task-frontend-sa
+  namespace: task-app
+  labels:
+    app: task-frontend
+    app.kubernetes.io/name: task-frontend
+    app.kubernetes.io/component: serviceaccount
+    app.kubernetes.io/part-of: task-management
+automountServiceAccountToken: false

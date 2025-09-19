@@ -1,0 +1,47 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: task-app
+  labels:
+    app: task-backend
+    app.kubernetes.io/name: task-backend
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: task-management
+data:
+  # Database configuration
+  DB_HOST: "postgres-service.database.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "taskdb"
+  
+  # Application configuration
+  LOG_LEVEL: "info"
+  RATE_LIMIT_MAX: "100"
+  ALLOWED_ORIGINS: "https://tasks.4sale.com,https://api.4sale.com"
+  
+  # Monitoring configuration
+  JAEGER_ENDPOINT: "http://jaeger-collector.monitoring.svc.cluster.local:14268/api/traces"
+  
+  # OpenTelemetry configuration
+  OTEL_SERVICE_NAME: "task-api"
+  OTEL_SERVICE_VERSION: "1.0.0"
+  OTEL_EXPORTER_JAEGER_ENDPOINT: "http://jaeger-collector.monitoring.svc.cluster.local:14268/api/traces"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+  namespace: task-app
+  labels:
+    app: task-backend
+    app.kubernetes.io/name: task-backend
+    app.kubernetes.io/component: secret
+    app.kubernetes.io/part-of: task-management
+type: Opaque
+data:
+  # Base64 encoded values
+  # Default values - these should be overridden in production
+  DB_USER: cG9zdGdyZXM=         # postgres
+  DB_PASSWORD: cG9zdGdyZXM=     # postgres

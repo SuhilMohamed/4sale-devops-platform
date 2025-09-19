@@ -1,0 +1,60 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-sa
+  namespace: database
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: serviceaccount
+    app.kubernetes.io/part-of: task-management
+automountServiceAccountToken: false
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: postgres-role
+  namespace: database
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: role
+    app.kubernetes.io/part-of: task-management
+rules:
+# Allow reading ConfigMaps and Secrets for database configuration
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+  resourceNames: ["postgres-config", "postgres-secret", "postgres-init-config"]
+
+# Allow reading pod information for cluster operations
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+
+# Allow reading service endpoints for service discovery
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: postgres-rolebinding
+  namespace: database
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: rolebinding
+    app.kubernetes.io/part-of: task-management
+subjects:
+- kind: ServiceAccount
+  name: postgres-sa
+  namespace: database
+roleRef:
+  kind: Role
+  name: postgres-role
+  apiGroup: rbac.authorization.k8s.io

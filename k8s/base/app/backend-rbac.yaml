@@ -1,0 +1,61 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: task-backend-sa
+  namespace: task-app
+  labels:
+    app: task-backend
+    app.kubernetes.io/name: task-backend
+    app.kubernetes.io/component: serviceaccount
+    app.kubernetes.io/part-of: task-management
+automountServiceAccountToken: false
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: task-backend-role
+  namespace: task-app
+  labels:
+    app: task-backend
+    app.kubernetes.io/name: task-backend
+    app.kubernetes.io/component: role
+    app.kubernetes.io/part-of: task-management
+rules:
+# Allow reading ConfigMaps and Secrets for configuration
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+  resourceNames: ["backend-config", "backend-secret"]
+
+# Allow reading service endpoints for service discovery
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list"]
+
+# Allow reading pod information for debugging
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+  resourceNames: []
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: task-backend-rolebinding
+  namespace: task-app
+  labels:
+    app: task-backend
+    app.kubernetes.io/name: task-backend
+    app.kubernetes.io/component: rolebinding
+    app.kubernetes.io/part-of: task-management
+subjects:
+- kind: ServiceAccount
+  name: task-backend-sa
+  namespace: task-app
+roleRef:
+  kind: Role
+  name: task-backend-role
+  apiGroup: rbac.authorization.k8s.io

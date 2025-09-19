@@ -1,0 +1,256 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: database
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: task-management
+data:
+  POSTGRES_DB: "taskdb"
+  POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"
+  
+  postgresql.conf: |
+    # PostgreSQL configuration for Kubernetes deployment
+    
+    # Connection settings
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 100
+    
+    # Memory settings
+    shared_buffers = 128MB
+    effective_cache_size = 512MB
+    work_mem = 4MB
+    maintenance_work_mem = 64MB
+    
+    # WAL settings
+    wal_level = replica
+    max_wal_size = 1GB
+    min_wal_size = 80MB
+    checkpoint_timeout = 5min
+    checkpoint_completion_target = 0.9
+    
+    # Logging settings
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = '/var/log/postgresql'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_statement = 'all'
+    log_min_duration_statement = 1000
+    log_checkpoints = on
+    log_connections = on
+    log_disconnections = on
+    log_lock_waits = on
+    
+    # Performance settings
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    
+    # Security settings
+    ssl = off  # Will be handled by ingress/proxy
+    password_encryption = scram-sha-256
+    
+    # Monitoring
+    track_activities = on
+    track_counts = on
+    track_io_timing = on
+    track_functions = all
+    stats_temp_directory = '/var/run/postgresql/stats_temp'
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-config
+  namespace: database
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: init-config
+    app.kubernetes.io/part-of: task-management
+data:
+  01-init.sql: |
+    -- Database initialization script for Task Management System
+    
+    -- Create the tasks table with proper constraints and indexes
+    CREATE TABLE IF NOT EXISTS tasks (
+        id UUID PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT DEFAULT '',
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+        priority VARCHAR(10) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Create indexes for better query performance
+    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
+    CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at DESC);
+    
+    -- Create a function to automatically update the updated_at timestamp
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+    END;
+    $$ language 'plpgsql';
+    
+    -- Create trigger to automatically update updated_at on task updates
+    CREATE TRIGGER update_tasks_updated_at 
+        BEFORE UPDATE ON tasks 
+        FOR EACH ROW 
+        EXECUTE FUNCTION update_updated_at_column();
+    
+    -- Insert some sample data for testing (optional)
+    INSERT INTO tasks (id, title, description, priority, status) VALUES
+        (gen_random_uuid(), 'Set up CI/CD Pipeline', 'Configure GitHub Actions for automated testing and deployment', 'high', 'in_progress'),
+        (gen_random_uuid(), 'Implement Monitoring', 'Deploy Prometheus and Grafana for application monitoring', 'medium', 'pending'),
+        (gen_random_uuid(), 'Security Audit', 'Review and implement security best practices', 'high', 'pending'),
+        (gen_random_uuid(), 'Performance Testing', 'Run load tests with Locust to validate scalability', 'medium', 'completed'),
+        (gen_random_uuid(), 'Documentation Update', 'Update README and deployment guides', 'low', 'pending')
+    ON CONFLICT (id) DO NOTHING;
+    
+    -- Create a view for task statistics (useful for monitoring)
+    CREATE OR REPLACE VIEW task_stats AS
+    SELECT 
+        COUNT(*) as total_tasks,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_tasks,
+        COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_tasks,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_tasks,
+        COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_tasks,
+        COUNT(CASE WHEN priority = 'medium' THEN 1 END) as medium_priority_tasks,
+        COUNT(CASE WHEN priority = 'low' THEN 1 END) as low_priority_tasks,
+        AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) as avg_completion_time_seconds
+    FROM tasks;
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: database
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: secret
+    app.kubernetes.io/part-of: task-management
+type: Opaque
+data:
+  # Base64 encoded values - these should be changed in production!
+  POSTGRES_USER: cG9zdGdyZXM=              # postgres
+  POSTGRES_PASSWORD: cG9zdGdyZXM=          # postgres
+  # Connection string for postgres exporter
+  DATA_SOURCE_NAME: cG9zdGdyZXNxbDovL3Bvc3RncmVzOnBvc3RncmVzQGxvY2FsaG9zdDo1NDMyL3Rhc2tkYj9zc2xtb2RlPWRpc2FibGU=  # postgresql://postgres:postgres@localhost:5432/taskdb?sslmode=disable
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: database
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: service
+    app.kubernetes.io/part-of: task-management
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9187"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: postgres
+  - name: metrics
+    port: 9187
+    targetPort: metrics
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: database
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: headless-service
+    app.kubernetes.io/part-of: task-management
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: postgres
+
+---
+# Network Policy to restrict database access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-network-policy
+  namespace: database
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: task-management
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  # Ingress rules - only allow connections from backend pods
+  ingress:
+  # Allow connections from task-backend in task-app namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: task-app
+      podSelector:
+        matchLabels:
+          app: task-backend
+    ports:
+    - protocol: TCP
+      port: 5432
+  
+  # Allow monitoring from prometheus
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 9187
+  
+  # Egress rules - minimal outbound access
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53

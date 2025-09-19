@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <title>4Sale Task Manager</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+        }
+
+        .status {
+            padding: 10px 20px;
+            background: #ecf0f1;
+            border-bottom: 1px solid #bdc3c7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e74c3c;
+        }
+
+        .status-dot.connected {
+            background: #27ae60;
+        }
+
+        .main-content {
+            padding: 20px;
+        }
+
+        .form-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        input, textarea, select, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .tasks-section h3 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .task-item {
+            background: white;
+            border: 1px solid #ecf0f1;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s;
+        }
+
+        .task-item:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .task-title {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+
+        .task-meta {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .task-status, .task-priority {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background: #f39c12;
+            color: white;
+        }
+
+        .status-in_progress {
+            background: #3498db;
+            color: white;
+        }
+
+        .status-completed {
+            background: #27ae60;
+            color: white;
+        }
+
+        .priority-low {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .priority-medium {
+            background: #f39c12;
+            color: white;
+        }
+
+        .priority-high {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .task-description {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .task-actions button {
+            width: auto;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            width: auto;
+            padding: 8px 12px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #27ae60;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .task-header {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .task-actions {
+                flex-direction: column;
+            }
+            
+            .task-actions button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 4Sale Task Manager</h1>
+            <p>Simple & Scalable Task Management Platform</p>
+        </div>
+        
+        <div class="status">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+            <div id="statsText">Total: 0 tasks</div>
+        </div>
+
+        <div class="main-content">
+            <div id="messageContainer"></div>
+
+            <div class="form-section">
+                <h3>📝 Add New Task</h3>
+                <form id="taskForm">
+                    <div class="form-group">
+                        <label for="title">Task Title *</label>
+                        <input type="text" id="title" name="title" required maxlength="255">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" name="description" maxlength="1000" placeholder="Enter task description..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="priority">Priority</label>
+                        <select id="priority" name="priority">
+                            <option value="low">🟢 Low</option>
+                            <option value="medium" selected>🟡 Medium</option>
+                            <option value="high">🔴 High</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" id="submitBtn">Add Task</button>
+                </form>
+            </div>
+
+            <div class="tasks-section">
+                <h3>📋 Task List</h3>
+                <div id="tasksContainer">
+                    <div class="loading">Loading tasks...</div>
+                </div>
+                
+                <div class="pagination" id="pagination" style="display: none;">
+                    <button id="prevBtn" onclick="previousPage()">← Previous</button>
+                    <span id="pageInfo">Page 1</span>
+                    <button id="nextBtn" onclick="nextPage()">Next →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TaskManager {
+            constructor() {
+                this.apiUrl = window.location.origin.replace(':8080', ':3000');
+                this.currentPage = 1;
+                this.totalPages = 1;
+                this.tasksPerPage = 10;
+                this.init();
+            }
+
+            async init() {
+                await this.checkApiConnection();
+                this.bindEvents();
+                await this.loadTasks();
+            }
+
+            async checkApiConnection() {
+                try {
+                    const response = await fetch(`${this.apiUrl}/health`);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.updateStatus(true, 'API Connected');
+                    } else {
+                        this.updateStatus(false, 'API Error');
+                    }
+                } catch (error) {
+                    console.error('API connection failed:', error);
+                    this.updateStatus(false, 'API Offline');
+                }
+            }
+
+            updateStatus(connected, text) {
+                const dot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                
+                dot.className = `status-dot ${connected ? 'connected' : ''}`;
+                statusText.textContent = text;
+            }
+
+            bindEvents() {
+                document.getElementById('taskForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.addTask();
+                });
+            }
+
+            async addTask() {
+                const form = document.getElementById('taskForm');
+                const submitBtn = document.getElementById('submitBtn');
+                const formData = new FormData(form);
+                
+                const task = {
+                    title: formData.get('title'),
+                    description: formData.get('description'),
+                    priority: formData.get('priority')
+                };
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Adding...';
+
+                try {
+                    const response = await fetch(`${this.apiUrl}/addTask`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(task)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        this.showMessage('Task added successfully!', 'success');
+                        form.reset();
+                        await this.loadTasks();
+                    } else {
+                        this.showMessage(result.error || 'Failed to add task', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error adding task:', error);
+                    this.showMessage('Network error. Please try again.', 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add Task';
+                }
+            }
+
+            async loadTasks(page = 1) {
+                const container = document.getElementById('tasksContainer');
+                container.innerHTML = '<div class="loading">Loading tasks...</div>';
+
+                try {
+                    const response = await fetch(`${this.apiUrl}/listTasks?page=${page}&limit=${this.tasksPerPage}`);
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        this.currentPage = data.pagination.currentPage;
+                        this.totalPages = data.pagination.totalPages;
+                        
+                        this.renderTasks(data.tasks);
+                        this.updatePagination(data.pagination);
+                        this.updateStats(data.pagination.totalTasks);
+                    } else {
+                        container.innerHTML = '<div class="error">Failed to load tasks</div>';
+                    }
+                } catch (error) {
+                    console.error('Error loading tasks:', error);
+                    container.innerHTML = '<div class="error">Network error loading tasks</div>';
+                }
+            }
+
+            renderTasks(tasks) {
+                const container = document.getElementById('tasksContainer');
+                
+                if (tasks.length === 0) {
+                    container.innerHTML = '<div class="loading">No tasks found. Add your first task!</div>';
+                    return;
+                }
+
+                container.innerHTML = tasks.map(task => `
+                    <div class="task-item">
+                        <div class="task-header">
+                            <div class="task-title">${this.escapeHtml(task.title)}</div>
+                        </div>
+                        <div class="task-meta">
+                            <span class="task-status status-${task.status}">${this.formatStatus(task.status)}</span>
+                            <span class="task-priority priority-${task.priority}">${this.formatPriority(task.priority)}</span>
+                        </div>
+                        ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
+                        <div class="task-actions">
+                            <button onclick="taskManager.updateTaskStatus('${task.id}', '${this.getNextStatus(task.status)}')">
+                                ${this.getStatusButtonText(task.status)}
+                            </button>
+                            <button onclick="taskManager.deleteTask('${task.id}')" class="btn-danger">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            async updateTaskStatus(id, status) {
+                try {
+                    const task = await this.getTaskById(id);
+                    if (!task) return;
+
+                    const response = await fetch(`${this.apiUrl}/updateTask/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            ...task,
+                            status: status
+                        })
+                    });
+
+                    if (response.ok) {
+                        this.showMessage('Task updated successfully!', 'success');
+                        await this.loadTasks(this.currentPage);
+                    } else {
+                        const result = await response.json();
+                        this.showMessage(result.error || 'Failed to update task', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error updating task:', error);
+                    this.showMessage('Network error. Please try again.', 'error');
+                }
+            }
+
+            async deleteTask(id) {
+                if (!confirm('Are you sure you want to delete this task?')) return;
+
+                try {
+                    const response = await fetch(`${this.apiUrl}/deleteTask/${id}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        this.showMessage('Task deleted successfully!', 'success');
+                        await this.loadTasks(this.currentPage);
+                    } else {
+                        const result = await response.json();
+                        this.showMessage(result.error || 'Failed to delete task', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting task:', error);
+                    this.showMessage('Network error. Please try again.', 'error');
+                }
+            }
+
+            async getTaskById(id) {
+                try {
+                    const response = await fetch(`${this.apiUrl}/listTasks`);
+                    const data = await response.json();
+                    return data.tasks.find(task => task.id === id);
+                } catch (error) {
+                    console.error('Error fetching task:', error);
+                    return null;
+                }
+            }
+
+            updatePagination(pagination) {
+                const paginationDiv = document.getElementById('pagination');
+                const prevBtn = document.getElementById('prevBtn');
+                const nextBtn = document.getElementById('nextBtn');
+                const pageInfo = document.getElementById('pageInfo');
+
+                if (pagination.totalPages > 1) {
+                    paginationDiv.style.display = 'flex';
+                    prevBtn.disabled = !pagination.hasPrev;
+                    nextBtn.disabled = !pagination.hasNext;
+                    pageInfo.textContent = `Page ${pagination.currentPage} of ${pagination.totalPages}`;
+                } else {
+                    paginationDiv.style.display = 'none';
+                }
+            }
+
+            updateStats(totalTasks) {
+                document.getElementById('statsText').textContent = `Total: ${totalTasks} tasks`;
+            }
+
+            showMessage(message, type) {
+                const container = document.getElementById('messageContainer');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = type;
+                messageDiv.textContent = message;
+                
+                container.innerHTML = '';
+                container.appendChild(messageDiv);
+                
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 5000);
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            formatStatus(status) {
+                const statusMap = {
+                    'pending': '⏳ Pending',
+                    'in_progress': '🔄 In Progress',
+                    'completed': '✅ Completed'
+                };
+                return statusMap[status] || status;
+            }
+
+            formatPriority(priority) {
+                const priorityMap = {
+                    'low': '🟢 Low',
+                    'medium': '🟡 Medium',
+                    'high': '🔴 High'
+                };
+                return priorityMap[priority] || priority;
+            }
+
+            getNextStatus(currentStatus) {
+                const statusFlow = {
+                    'pending': 'in_progress',
+                    'in_progress': 'completed',
+                    'completed': 'pending'
+                };
+                return statusFlow[currentStatus] || 'pending';
+            }
+
+            getStatusButtonText(currentStatus) {
+                const buttonTextMap = {
+                    'pending': 'Start Task',
+                    'in_progress': 'Complete',
+                    'completed': 'Reopen'
+                };
+                return buttonTextMap[currentStatus] || 'Update';
+            }
+        }
+
+        function previousPage() {
+            if (taskManager.currentPage > 1) {
+                taskManager.loadTasks(taskManager.currentPage - 1);
+            }
+        }
+
+        function nextPage() {
+            if (taskManager.currentPage < taskManager.totalPages) {
+                taskManager.loadTasks(taskManager.currentPage + 1);
+            }
+        }
+
+        // Initialize the application
+        const taskManager = new TaskManager();
+    </script>
+</body>
+</html>

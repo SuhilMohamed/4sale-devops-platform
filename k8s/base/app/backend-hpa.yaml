@@ -1,0 +1,107 @@
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: task-backend-hpa
+  namespace: task-app
+  labels:
+    app: task-backend
+    app.kubernetes.io/name: task-backend
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/part-of: task-management
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: task-backend
+  
+  # Scaling configuration
+  minReplicas: 2
+  maxReplicas: 20
+  
+  # Scaling behavior
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+  
+  # Metrics for scaling decisions
+  metrics:
+  
+  # CPU Utilization Scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  
+  # Memory Utilization Scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  
+  # Custom metrics from Prometheus (requests per second)
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+        selector:
+          matchLabels:
+            app: task-backend
+      target:
+        type: AverageValue
+        averageValue: "100"
+  
+  # Request queue length metric
+  - type: Pods
+    pods:
+      metric:
+        name: http_request_duration_seconds
+        selector:
+          matchLabels:
+            app: task-backend
+      target:
+        type: AverageValue
+        averageValue: "500m"
+
+---
+# ServiceMonitor for Prometheus metrics collection
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: task-backend-metrics
+  namespace: task-app
+  labels:
+    app: task-backend
+    app.kubernetes.io/name: task-backend
+    app.kubernetes.io/component: metrics
+spec:
+  selector:
+    matchLabels:
+      app: task-backend
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
